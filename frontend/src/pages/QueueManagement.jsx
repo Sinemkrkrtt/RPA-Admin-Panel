@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, Filter, ListTodo, RefreshCcw, Trash2, 
   CheckCircle, AlertCircle, Clock, PlayCircle, 
-  ArrowUp, ArrowRight, ArrowDown, ChevronDown, Plus, X
+  ArrowUp, ArrowRight, ArrowDown, ChevronDown, Plus, X, Download
 } from 'lucide-react';
 import './QueueManagement.css';
 
@@ -93,7 +93,6 @@ export default function QueueManagement() {
   };
 
   // İş Durumunu Değiştirme (Pending -> Processing -> Completed)
-  // Bu aynı zamanda ilgili Bot'un durumunu da değiştirir!
   const handleTaskStatusChange = async (task, newStatus) => {
     try {
       // 1. Önce Görevin (Task) durumunu güncelle
@@ -108,19 +107,15 @@ export default function QueueManagement() {
         setTasks(tasks.map(t => t.id === task.id ? updatedTask : t));
 
         // 2. Şimdi bu işi yapan BOT'un durumunu güncellemek için
-        // Botları çektiğimiz availableBots listesinden o botu bulalım
         const targetBot = availableBots.find(b => b.name === task.bot_name);
         
         if (targetBot) {
-          // Eğer iş "Processing" olduysa bot "Running" olsun.
-          // Eğer iş "Completed" veya "Failed" olduysa bot tekrar "Idle" (Bekliyor) olsun.
           let botNewStatus = 'Idle';
           if (newStatus === 'Processing') botNewStatus = 'Running';
 
           const now = new Date();
           const timeString = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}`;
 
-          // Backend'deki /api/robots/:id/status endpointine istek atıyoruz
           await fetch(`http://localhost:5000/api/robots/${targetBot.id}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -157,6 +152,39 @@ export default function QueueManagement() {
     return matchesSearch && matchesFilter;
   });
 
+  // --- YENİ EKLENEN: İŞ KUYRUĞUNU CSV OLARAK İNDİRME ---
+  const handleExportCSV = () => {
+    if (filteredTasks.length === 0) {
+      alert("İndirilecek veri bulunamadı!");
+      return;
+    }
+
+    // CSV formatında başlıklar
+    let csvContent = "Gorev ID,Bagli Bot,Is Detayi,Oncelik,Olusturulma Tarihi,Durum\n";
+
+    // Tablodaki filtreli verileri CSV formatına çeviriyoruz
+    filteredTasks.forEach(task => {
+      // Açıklama içindeki virgül veya satır atlamaları CSV'yi bozmasın diye temizliyoruz
+      const safeDesc = task.description ? task.description.replace(/,/g, " ").replace(/\n/g, " ") : "";
+      csvContent += `TASK-${task.id},${task.bot_name},${safeDesc},${task.priority},${task.created_at},${task.status}\n`;
+    });
+
+    // Blob objesi oluşturma (Türkçe karakterler bozulmasın diye \uFEFF ekliyoruz)
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Is_Kuyrugu_Raporu_${new Date().toLocaleDateString('tr-TR')}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+  // --------------------------------------------------------
+
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -184,19 +212,22 @@ export default function QueueManagement() {
     <div className="page-container">
       
     <div className="page-header">
-  <div>
-  
-  </div>
-  <div style={{ display: 'flex', gap: '10px' }}>
-    {/* YENİ EKLENEN YENİLE BUTONU */}
-    <button className="btn-secondary" onClick={fetchTasks} title="Kuyruğu Yenile">
-      <RefreshCcw size={18} />
-    </button>
-    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-      <Plus size={18} /> Yeni İş Ata
-    </button>
-  </div>
-</div>
+      <div>
+        <h2>İş Kuyruğu ve Görev Yönetimi</h2>
+      </div>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        {/* YENİ EKLENEN İNDİR BUTONU */}
+        <button className="btn-secondary" onClick={handleExportCSV} title="Kuyruğu İndir (CSV)">
+          <Download size={18} /> İndir
+        </button>
+        <button className="btn-secondary" onClick={fetchTasks} title="Kuyruğu Yenile">
+          <RefreshCcw size={18} />
+        </button>
+        <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+          <Plus size={18} /> Yeni İş Ata
+        </button>
+      </div>
+    </div>
 
       <div className="table-toolbar">
         <div className="search-box">
@@ -247,7 +278,6 @@ export default function QueueManagement() {
           <tbody>
             {filteredTasks.length > 0 ? (
               filteredTasks.map((task) => {
-                // YENİ: Duruma göre satır rengi belirlemek için dinamik sınıf ataması
                 let rowStatusClass = '';
                 if (task.status === 'Processing') rowStatusClass = 'row-processing';
                 if (task.status === 'Completed') rowStatusClass = 'row-completed';
@@ -255,7 +285,6 @@ export default function QueueManagement() {
 
                 return (
                   <tr key={task.id} className={rowStatusClass}>
-                    {/* Veritabanı ID'sini daha havalı görünmesi için başına TASK- ekleyerek basıyoruz */}
                     <td className="font-medium text-main">TASK-{task.id}</td>
                     <td className="font-semibold">{task.bot_name}</td>
                     <td className="text-muted">{task.description}</td>
@@ -264,7 +293,6 @@ export default function QueueManagement() {
                     <td>{getStatusBadge(task.status)}</td>
                     <td className="text-right">
                       <div className="action-buttons">
-                        {/* İşi Başlat (Processing) */}
                         <button 
                           className="action-btn play" 
                           title="İşi Başlat"
@@ -275,7 +303,6 @@ export default function QueueManagement() {
                           <PlayCircle size={16} />
                         </button>
 
-                        {/* İşi Tamamla (Completed) */}
                         <button 
                           className="action-btn stop" 
                           title="İşi Tamamla"
@@ -328,7 +355,6 @@ export default function QueueManagement() {
               <div className="form-group">
                 <label>Görevi Yapacak Bot</label>
                 <select name="bot_name" value={formData.bot_name} onChange={handleInputChange} required>
-                  {/* Veritabanından gelen gerçek botları listeliyoruz */}
                   {availableBots.length > 0 ? (
                     availableBots.map(bot => (
                       <option key={bot.id} value={bot.name}>{bot.name}</option>

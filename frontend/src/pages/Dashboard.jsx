@@ -5,17 +5,15 @@ import {
 } from 'recharts';
 import { 
   Activity, Server, Clock, AlertTriangle, 
-  CheckCircle, Bell, TrendingUp, TrendingDown, Loader
+  CheckCircle, Bell, TrendingUp, TrendingDown, Loader, Download // Download ikonu eklendi
 } from 'lucide-react';
 
 const PIE_COLORS = ['#6366f1', '#94a3b8']; 
 
 export default function Dashboard({ isDarkMode }) {
-  // Backend'den gelecek veriyi tutacağımız state
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sayfa yüklendiğinde API'ye istek at
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -34,7 +32,36 @@ export default function Dashboard({ isDarkMode }) {
     fetchDashboardData();
   }, []);
 
-  // Veri yüklenene kadar gösterilecek ekran
+  // --- YENİ EKLENEN: CSV OLARAK DIŞA AKTARMA FONKSİYONU ---
+  const handleExportCSV = () => {
+    if (!dashboardData) return;
+
+    // CSV formatında başlıklar
+    let csvContent = "Gun,Basarili Islem,Hatali Islem\n";
+
+    // Tablodaki her bir haftalık veri satırını CSV formatına çeviriyoruz
+    dashboardData.weeklyData.forEach(row => {
+      csvContent += `${row.gun},${row.Basarili},${row.Hatali}\n`;
+    });
+
+    // Blob objesi oluşturma (Türkçe karakter sorunu olmasın diye \uFEFF ekliyoruz)
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Tarayıcıda sahte bir indirme linki (a tag) oluşturup tıklatıyoruz
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Haftalik_Islem_Raporu_${new Date().toLocaleDateString('tr-TR')}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    // İşlem bitince sahte linki temizle
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+  // --------------------------------------------------------
+
   if (isLoading) {
     return (
       <main className="main-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -46,7 +73,6 @@ export default function Dashboard({ isDarkMode }) {
     );
   }
 
-  // API'den veri gelmezse boş bir obje ile çökmeyi önlüyoruz
   const data = dashboardData || {
     kpi: { totalBots: 0, activeBots: 0, queuedTasks: 0, successRate: 0 },
     weeklyData: [],
@@ -63,7 +89,6 @@ export default function Dashboard({ isDarkMode }) {
             <div className="kpi-icon-box blue"><Server size={22} /></div>
           </div>
           <div className="kpi-body">
-            {/* Veritabanından gelen GERÇEK Toplam Bot Sayısı */}
             <h2>{data.kpi.totalBots}</h2>
             <span className="trend positive"><TrendingUp size={16}/> Güncel Veri</span>
           </div>
@@ -75,7 +100,6 @@ export default function Dashboard({ isDarkMode }) {
             <div className="kpi-icon-box green"><Activity size={22} /></div>
           </div>
           <div className="kpi-body">
-             {/* Veritabanından gelen GERÇEK Aktif Bot Sayısı */}
             <h2>{data.kpi.activeBots}</h2>
             <span className="trend neutral">Canlı İzleme</span>
           </div>
@@ -107,7 +131,19 @@ export default function Dashboard({ isDarkMode }) {
       {/* GRAFİKLER ALANI */}
       <div className="charts-wrapper">
         <div className="chart-box main-chart">
-          <h2 className="section-title">Haftalık İşlem Özeti</h2>
+          {/* YENİ EKLENEN: Başlık ve İndirme Butonu Yanyana */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h2 className="section-title" style={{ margin: 0 }}>Haftalık İşlem Özeti</h2>
+            <button 
+              className="btn-primary" 
+              onClick={handleExportCSV}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', fontSize: '13px' }}
+            >
+              <Download size={16} /> Raporu İndir (CSV)
+            </button>
+          </div>
+          {/* ------------------------------------------- */}
+          
           <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer>
               <BarChart data={data.weeklyData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
@@ -151,7 +187,6 @@ export default function Dashboard({ isDarkMode }) {
           </div>
         </div>
       </div>
-
       {/* SİSTEM BİLDİRİMLERİ (LOG) */}
       <div className="alerts-section">
         <div className="section-header">

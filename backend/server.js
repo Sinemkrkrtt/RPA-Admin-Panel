@@ -1,14 +1,13 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
-const nodemailer = require('nodemailer'); // YENİ EKLENDİ
+const nodemailer = require('nodemailer'); 
 const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
 
 const pool = new Pool({
   user: 'postgres',
@@ -18,39 +17,57 @@ const pool = new Pool({
   port: 5433,
 });
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+
+// Swagger Ayarları
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'RPA Admin Paneli API',
+      version: '1.0.0',
+      description: 'RPA Yönetim Paneli için geliştirilmiş REST API uç noktaları.',
+    },
+    servers: [
+      {
+        url: 'http://localhost:5000',
+      },
+    ],
+  },
+  apis: ['./server.js'], // API dokümantasyonunu bu dosyadan okuyacak
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // --- YENİ EKLENEN E-POSTA SERVİS FONKSİYONU ---
 async function sendAlertEmail(subject, htmlContent) {
   try {
-    // 1. Ayarlar tablosundan JSONB verisini çek
     const result = await pool.query("SELECT config_data FROM settings WHERE id = 1");
     if (result.rows.length === 0) return;
     
     const configData = result.rows[0].config_data;
-    
-    // Varsayım: Arayüzden kaydedilen SMTP ayarları config_data.smtp içinde tutuluyor
     const smtpConfig = configData.smtp; 
     
-    // Eğer SMTP ayarı yoksa veya kapalıysa işlemi iptal et
     if (!smtpConfig || !smtpConfig.isEnabled) {
       console.log("E-posta bildirimleri kapalı veya SMTP ayarı bulunamadı.");
       return;
     }
 
-    // 2. Nodemailer kurulumunu yap
     const transporter = nodemailer.createTransport({
       host: smtpConfig.host,
       port: smtpConfig.port,
-      secure: smtpConfig.port == 465, // 465 ise true
+      secure: smtpConfig.port == 465, 
       auth: {
         user: smtpConfig.user,
         pass: smtpConfig.password
       }
     });
 
-    // 3. Sadece yetkili ve aktif kullanıcıların maillerini çek
     const usersResult = await pool.query(
-  "SELECT email FROM users WHERE role IN ('Süper Admin', 'Operatör') AND status = 'Aktif'"
-);
+      "SELECT email FROM users WHERE role IN ('Süper Admin', 'Operatör') AND status = 'Aktif'"
+    );
     
     const adminEmails = usersResult.rows.map(u => u.email).join(',');
     
@@ -59,7 +76,6 @@ async function sendAlertEmail(subject, htmlContent) {
       return;
     }
 
-    // 4. Maili gönder
     await transporter.sendMail({
       from: `"RPA Sistem Uyarıcısı" <${smtpConfig.user}>`,
       to: adminEmails,
@@ -74,8 +90,16 @@ async function sendAlertEmail(subject, htmlContent) {
 }
 // ----------------------------------------------
 
-
-// Veritabanı test endpoint'i
+/**
+ * @swagger
+ * /api/test:
+ *   get:
+ *     summary: Veritabanı bağlantı testi
+ *     description: Sistemin PostgreSQL veritabanına bağlanıp bağlanmadığını kontrol eder.
+ *     responses:
+ *       200:
+ *         description: Bağlantı başarılı mesajı ve sunucu saati döner.
+ */
 app.get('/api/test', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
@@ -86,7 +110,16 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
-// 1. TÜM ROBOTLARI LİSTELEME (GET)
+/**
+ * @swagger
+ * /api/robots:
+ *   get:
+ *     summary: Tüm robotları listeler
+ *     description: Sistemde kayıtlı olan tüm RPA botlarını getirir.
+ *     responses:
+ *       200:
+ *         description: Başarılı bir şekilde robot listesi döndürüldü.
+ */
 app.get('/api/robots', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM robots ORDER BY id DESC");
@@ -97,7 +130,31 @@ app.get('/api/robots', async (req, res) => {
   }
 });
 
-// 2. YENİ ROBOT EKLEME (POST)
+/**
+ * @swagger
+ * /api/robots:
+ *   post:
+ *     summary: Yeni robot ekler
+ *     description: Sisteme yeni bir RPA botu kaydeder.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               version:
+ *                 type: string
+ *               schedule:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Robot başarıyla eklendi.
+ */
 app.post('/api/robots', async (req, res) => {
   try {
     const { name, version, schedule, description } = req.body;
@@ -116,7 +173,22 @@ app.post('/api/robots', async (req, res) => {
   }
 });
 
-// 3. ROBOT SİLME (DELETE)
+/**
+ * @swagger
+ * /api/robots/{id}:
+ *   delete:
+ *     summary: Robot siler
+ *     description: ID'si verilen botu sistemden tamamen siler.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Robot başarıyla silindi.
+ */
 app.delete('/api/robots/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,9 +200,16 @@ app.delete('/api/robots/:id', async (req, res) => {
   }
 });
 
-
-
-// 5. DASHBOARD İSTATİSTİKLERİ (GET)
+/**
+ * @swagger
+ * /api/dashboard:
+ *   get:
+ *     summary: Dashboard istatistikleri
+ *     description: Ana sayfa için gerekli olan KPI kart verilerini ve grafik bilgilerini getirir.
+ *     responses:
+ *       200:
+ *         description: İstatistiksel veriler başarıyla çekildi.
+ */
 app.get('/api/dashboard', async (req, res) => {
   try {
     const totalResult = await pool.query("SELECT COUNT(*) FROM robots");
@@ -170,7 +249,16 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// 1. Tüm İşleri Listele (GET)
+/**
+ * @swagger
+ * /api/tasks:
+ *   get:
+ *     summary: Tüm işleri listeler
+ *     description: İş kuyruğundaki tüm görevleri getirir.
+ *     responses:
+ *       200:
+ *         description: İş kuyruğu listesi başarıyla döndürüldü.
+ */
 app.get('/api/tasks', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM tasks ORDER BY id DESC");
@@ -181,7 +269,31 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
-// 2. Yeni İş Ekle (POST)
+/**
+ * @swagger
+ * /api/tasks:
+ *   post:
+ *     summary: Yeni iş ekler
+ *     description: İş kuyruğuna yeni bir görev atar.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bot_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               priority:
+ *                 type: string
+ *               created_at:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: İş başarıyla kaydedildi.
+ */
 app.post('/api/tasks', async (req, res) => {
   try {
     const { bot_name, description, priority, created_at } = req.body;
@@ -200,7 +312,31 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
-// 3. İş Durumunu Güncelle / Retry (PUT)
+/**
+ * @swagger
+ * /api/tasks/{id}/status:
+ *   put:
+ *     summary: İş durumunu günceller
+ *     description: Kuyruktaki bir işin durumunu (Processing, Completed vb.) günceller.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: İş durumu güncellendi.
+ */
 app.put('/api/tasks/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -218,7 +354,22 @@ app.put('/api/tasks/:id/status', async (req, res) => {
   }
 });
 
-// 4. İşi Sil (DELETE)
+/**
+ * @swagger
+ * /api/tasks/{id}:
+ *   delete:
+ *     summary: İşi siler
+ *     description: Kuyruktan belirtilen işi siler.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: İş başarıyla silindi.
+ */
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -230,7 +381,15 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
-// 1. Tüm Logları Getir (GET)
+/**
+ * @swagger
+ * /api/logs:
+ *   get:
+ *     summary: Sistem loglarını getirir
+ *     responses:
+ *       200:
+ *         description: Sistem logları listesi.
+ */
 app.get('/api/logs', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM logs ORDER BY id DESC");
@@ -241,7 +400,33 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-// 2. Yeni Log Ekle (POST)
+/**
+ * @swagger
+ * /api/logs:
+ *   post:
+ *     summary: Yeni log ekler
+ *     description: Sisteme yeni bir hata veya bilgi logu düşer.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bot_name:
+ *                 type: string
+ *               log_type:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *               stack_trace:
+ *                 type: string
+ *               created_at:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Log başarıyla eklendi.
+ */
 app.post('/api/logs', async (req, res) => {
   try {
     const { bot_name, log_type, message, stack_trace, created_at } = req.body;
@@ -259,7 +444,15 @@ app.post('/api/logs', async (req, res) => {
   }
 });
 
-// 1. Kullanıcıları Listele (GET)
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Tüm kullanıcıları listeler
+ *     responses:
+ *       200:
+ *         description: Sistemdeki yetkili kullanıcılar.
+ */
 app.get('/api/users', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM users ORDER BY id ASC");
@@ -269,7 +462,34 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// 2. Yeni Kullanıcı Ekle
+/**
+ * @swagger
+ * /api/users:
+ *   post:
+ *     summary: Yeni kullanıcı oluşturur
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               full_name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               created_at:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Kullanıcı eklendi.
+ */
 app.post('/api/users', async (req, res) => {
   try {
     const { full_name, email, password, role, status, created_at } = req.body;
@@ -286,7 +506,27 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// Sisteme Giriş (Login) Endpoint'i
+/**
+ * @swagger
+ * /api/login:
+ *   post:
+ *     summary: Kullanıcı girişi
+ *     description: Email ve şifre ile sisteme giriş doğrulaması yapar.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Giriş başarılı.
+ */
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -311,7 +551,21 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 3. Kullanıcı Sil (DELETE)
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Kullanıcıyı siler
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Kullanıcı silindi.
+ */
 app.delete('/api/users/:id', async (req, res) => {
   try {
     await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
@@ -321,7 +575,15 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// 1. Ayarları Getir (GET)
+/**
+ * @swagger
+ * /api/settings:
+ *   get:
+ *     summary: Sistem ayarlarını getirir
+ *     responses:
+ *       200:
+ *         description: Ayarlar JSONB objesi döner.
+ */
 app.get('/api/settings', async (req, res) => {
   try {
     const result = await pool.query("SELECT config_data FROM settings WHERE id = 1");
@@ -335,7 +597,21 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-// 2. Ayarları Güncelle (PUT)
+/**
+ * @swagger
+ * /api/settings:
+ *   put:
+ *     summary: Sistem ayarlarını günceller
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Ayarlar başarıyla güncellendi.
+ */
 app.put('/api/settings', async (req, res) => {
   try {
     const config_data = req.body;
@@ -345,11 +621,10 @@ app.put('/api/settings', async (req, res) => {
     res.status(500).json({ error: 'Ayarlar güncellenemedi' });
   }
 });
+
 cron.schedule('* * * * *', async () => {
   console.log('⏳ [CRON] Zamanlanmış görev kontrolü yapılıyor...');
   try {
-    // Veritabanından zamanlama planı ayarlanmış robotları bul
-    // Test edebilmek için schedule alanı 'Her Dakika' olanları çekiyoruz
     const result = await pool.query("SELECT * FROM robots WHERE schedule = 'Her Dakika' AND status != 'Error'");
     const scheduledBots = result.rows;
 
@@ -359,7 +634,6 @@ cron.schedule('* * * * *', async () => {
       
       const autoDescription = `[OTOMASYON] ${bot.name} için planlanmış sistem taraması.`;
 
-      // 1. İlgili bot için İş Kuyruğuna (tasks) otomatik görev ekle
       await pool.query(
         `INSERT INTO tasks (bot_name, description, priority, status, created_at) 
          VALUES ($1, $2, $3, 'Pending', $4)`,
@@ -373,7 +647,6 @@ cron.schedule('* * * * *', async () => {
   }
 });
 
-// YENİ: Denetim İzi (Audit Log) Kaydetme Yardımcı Fonksiyonu
 async function createAuditLog(user_name, action, details) {
   try {
     const now = new Date();
@@ -388,7 +661,16 @@ async function createAuditLog(user_name, action, details) {
   }
 }
 
-// 6. TÜM DENETİM İZLERİNİ GETİRME (GET) - Arayüzdeki Audit sekmesi için
+/**
+ * @swagger
+ * /api/audit-logs:
+ *   get:
+ *     summary: Tüm denetim izlerini (Audit Logs) listeler
+ *     description: Sistem yöneticilerinin yaptığı işlemlerin kayıtlarını döndürür.
+ *     responses:
+ *       200:
+ *         description: Denetim izleri başarıyla getirildi.
+ */
 app.get('/api/audit-logs', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM audit_logs ORDER BY id DESC");
@@ -398,13 +680,42 @@ app.get('/api/audit-logs', async (req, res) => {
   }
 });
 
-// 4. BOT DURUMUNU GÜNCELLEME (PUT) - Başlat / Durdur / Yeniden Başlat (MAİL + AUDIT LOG EKLENDİ)
+/**
+ * @swagger
+ * /api/robots/{id}/status:
+ *   put:
+ *     summary: Robotun çalışma durumunu günceller
+ *     description: Botu başlatır, durdurur veya hata durumuna geçirir. Aynı zamanda Audit Log'a kayıt düşer.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *               last_run:
+ *                 type: string
+ *               errorMessage:
+ *                 type: string
+ *               requested_by:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Durum başarıyla güncellendi.
+ */
 app.put('/api/robots/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, last_run, errorMessage, requested_by } = req.body; 
 
-    // 1. Veritabanında botun durumunu güncelle
     const result = await pool.query(
       "UPDATE robots SET status = $1, last_run = $2 WHERE id = $3 RETURNING *",
       [status, last_run, id]
@@ -416,7 +727,6 @@ app.put('/api/robots/:id/status', async (req, res) => {
 
     const updatedRobot = result.rows[0];
 
-    // 2. MAİL SİSTEMİ: Eğer bot hata verirse yetkililere mail at
     if (status === 'Error' || status === 'Failed') {
       const mailSubject = `Kritik Hata: ${updatedRobot.name} Durdu!`;
       const mailHtml = `
@@ -429,17 +739,14 @@ app.put('/api/robots/:id/status', async (req, res) => {
               <p style="font-size: 12px; color: #888;">Lütfen yönetim paneline giriş yaparak sistem loglarını kontrol ediniz.</p>
           </div>
       `;
-      sendAlertEmail(mailSubject, mailHtml); // Maili fırlat
+      sendAlertEmail(mailSubject, mailHtml); 
     }
 
-    // 3. DENETİM İZİ (AUDIT LOG) SİSTEMİ: Yapılan işlemi veritabanına kaydet
     const userName = requested_by || 'Sistem / Admin'; 
     const auditDetail = `${updatedRobot.name} isimli botun durumu '${status}' olarak değiştirildi.`;
     
-    // Fonksiyonu asenkron çalışmaya (await yapmadan) bırakıyoruz ki API yanıtı gecikmesin
     createAuditLog(userName, 'Bot Durum Güncellemesi', auditDetail);
 
-    // 4. İşlem bitti, güncel bot bilgisini frontend'e geri yolla
     res.json(updatedRobot);
     
   } catch (err) {

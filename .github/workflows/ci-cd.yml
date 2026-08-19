@@ -1,0 +1,28 @@
+name: RPA Backend CI/CD
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Kodu Çek (Checkout)
+      uses: actions/checkout@v3
+
+    - name: Node.js Kurulumu
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Backend Bağımlılıklarını Kur
+      working-directory: ./backend # Backend klasörünün adı neyse onu yazın
+      run: npm install
+
+    - name: Docker İmajını Derle
+      working-directory: ./backend
+      run: docker build -t rpa-backend-image .
