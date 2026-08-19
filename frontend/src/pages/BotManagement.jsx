@@ -154,8 +154,7 @@ export default function BotManagement() {
       
       <div className="page-header">
         <div>
-          <h1 className="page-title"><Server size={24} className="text-primary" /> Robot Yönetimi</h1>
-          <p className="page-subtitle">Sistemdeki tüm RPA botlarını yönetin, filtreleyin ve zamanlayın.</p>
+         
         </div>
         <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
           <Plus size={18} /> Yeni Bot Ekle
@@ -323,7 +322,7 @@ export default function BotManagement() {
                 </div>
               </div>
 
-              <div className="form-group">
+            <div className="form-group">
                 <label>Zamanlama Planı (Cron)</label>
                 <select name="schedule" value={formData.schedule} onChange={handleInputChange}>
                   <option value="Yok">Manuel (Sadece Tıklamayla)</option>

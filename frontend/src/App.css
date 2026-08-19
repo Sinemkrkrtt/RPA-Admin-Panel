@@ -102,22 +102,22 @@ body {
 
 .nav-links {
   display: flex;
-  justify-content: center;
-  gap: 32px;
-  flex: 2;
+  align-items: center;
+  gap: 16px; /* Öğeler arası boşluğu optimize ettik */
 }
 
 .nav-item {
   color: var(--text-muted);
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 8px 12px; /* Pad değerini hafifçe kısmak da yer kazandırır */
+  border-radius: 8px;
+  transition: all 0.2s;
   cursor: pointer;
-  padding: 24px 0;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
+  
+  /* YENİ EKLENEN KOD: Kelimelerin alt satıra kaymasını engeller */
+  white-space: nowrap; 
 }
-
 .nav-item.active, .nav-item:hover {
   color: var(--text-main);
   border-bottom: 2px solid var(--brand-primary);

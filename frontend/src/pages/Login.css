@@ -1,0 +1,163 @@
+/* src/pages/Login.css */
+
+.login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Tüm ekranı kaplaması için */
+  min-height: calc(100vh - 80px); 
+  width: 100%;
+}
+
+.login-card {
+  background-color: var(--bg-card);
+  width: 100%;
+  max-width: 420px;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  animation: slideUpFade 0.4s ease-out;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-logo {
+  width: 64px;
+  height: 64px;
+  background-color: rgba(99, 102, 241, 0.1);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px auto;
+}
+
+.login-header h2 {
+  font-size: 1.5rem;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.login-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.login-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  text-align: center;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.login-form .form-group {
+  margin-bottom: 20px;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon .input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+}
+
+.input-with-icon input {
+  width: 100%;
+  padding: 12px 16px 12px 42px;
+  background-color: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.input-with-icon input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.forgot-password {
+  text-align: right;
+  margin-bottom: 24px;
+}
+
+.forgot-password a {
+  color: var(--brand-primary);
+  font-size: 0.85rem;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+}
+
+/* Yükleniyor Animasyonu */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+.login-footer p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.login-footer a {
+  color: var(--text-main);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-footer a:hover {
+  color: var(--brand-primary);
+}

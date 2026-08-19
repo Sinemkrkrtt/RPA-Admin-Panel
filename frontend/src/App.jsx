@@ -3,6 +3,12 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import { Database, Moon, Sun } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import BotManagement from './pages/BotManagement';
+import QueueManagement from './pages/QueueManagement';
+import SystemLogs from './pages/SystemLogs';
+import UserManagement from './pages/UserManagement';
+import Login from './pages/Login';
+import SystemSettings from './pages/SystemSettings';
+import AuditLogs from './pages/AuditLogs'; // YENİ EKLENDİ
 import './App.css';
 
 // Navbar bileşeni: Hangi sayfada olduğumuzu (useLocation) anlayıp o menüyü aktif yapar.
@@ -23,13 +29,29 @@ function Navbar({ isDarkMode, toggleTheme }) {
         <Link to="/bots" className={`nav-item ${location.pathname === '/bots' ? 'active' : ''}`}>
           Robot Yönetimi
         </Link>
-        <div className="nav-item">İş Kuyruğu</div>
-        <div className="nav-item">Kullanıcılar</div>
-        <div className="nav-item">Ayarlar</div>
+        <Link to="/queue" className={`nav-item ${location.pathname === '/queue' ? 'active' : ''}`}>
+          İş Kuyruğu
+        </Link>
+        <Link to="/logs" className={`nav-item ${location.pathname === '/logs' ? 'active' : ''}`}>
+          Log ve İzleme
+        </Link>
+        <Link to="/audit" className={`nav-item ${location.pathname === '/audit' ? 'active' : ''}`}>
+          Denetim İzleri {/* YENİ EKLENDİ */}
+        </Link>
+        <Link to="/users" className={`nav-item ${location.pathname === '/users' ? 'active' : ''}`}>
+          Kullanıcılar
+        </Link>
+       <Link to="/settings" className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}>
+        Ayarlar
+      </Link>
       </div>
 
       <div className="nav-actions">
-        <button className="btn-primary">Get Started</button>
+        {/* Yönlendirme işlemi için Link kullanıldı ve buton stili korundu */}
+        <Link to="/login" className="btn-primary" style={{ textDecoration: 'none' }}>
+          Giriş Yap
+        </Link>
+        
         <div className="theme-toggle" onClick={toggleTheme}>
           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
         </div>
@@ -61,7 +83,13 @@ function App() {
         <Routes>
           {/* Dashboard bileşenine tema bilgisini prop olarak yolluyoruz ki grafik renkleri değişebilsin */}
           <Route path="/" element={<Dashboard isDarkMode={isDarkMode} />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/bots" element={<BotManagement />} />
+          <Route path="/queue" element={<QueueManagement />} />
+          <Route path="/logs" element={<SystemLogs />} />
+          <Route path="/audit" element={<AuditLogs />} /> {/* YENİ EKLENDİ */}
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="/settings" element={<SystemSettings />} />
         </Routes>
       </div>
     </BrowserRouter>
