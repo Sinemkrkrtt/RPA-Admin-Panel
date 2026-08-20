@@ -1,77 +1,230 @@
 /* src/pages/Login.css */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-.login-wrapper {
+.login-page {
+  display: flex;
+  min-height: calc(100vh - 80px);
+  width: 100%;
+  background-color: var(--bg-body);
+}
+
+/* ============ SOL: Otomasyon konsolu ============ */
+.login-visual {
+  position: relative;
+  flex: 1 1 42%;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 36px;
+  background: radial-gradient(circle at 20% 0%, #182236 0%, #0D121B 60%);
+  color: #E8EBF0;
+  overflow: hidden;
+}
+
+.visual-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(61, 220, 151, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 220, 151, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at 30% 20%, black, transparent 75%);
+}
+
+.visual-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: #3DDC97;
+  z-index: 1;
+}
+
+.pipeline {
+  position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Tüm ekranı kaplaması için */
-  min-height: calc(100vh - 80px); 
+  margin: 8px 0;
+  z-index: 1;
+}
+
+.pipeline-svg {
   width: 100%;
+  max-width: 220px;
+  height: 100%;
+  max-height: 380px;
+}
+
+.pipeline-track {
+  stroke: #223047;
+  stroke-width: 2;
+}
+
+.pipeline-flow {
+  stroke: #3DDC97;
+  stroke-width: 2;
+  stroke-dasharray: 360;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.node-dot {
+  fill: #0D121B;
+  stroke: #3A4A63;
+  stroke-width: 2;
+  transition: all 0.4s ease;
+}
+
+.node-dot.node-done {
+  fill: #3DDC97;
+  stroke: #3DDC97;
+}
+
+.node-dot.node-active {
+  fill: #3DDC97;
+  stroke: #3DDC97;
+}
+
+.node-pulse {
+  fill: none;
+  stroke: #3DDC97;
+  stroke-width: 1.5;
+  opacity: 0.6;
+  animation: pulseRing 1.9s ease-out infinite;
+}
+
+@keyframes pulseRing {
+  from { r: 7; opacity: 0.6; }
+  to   { r: 18; opacity: 0; }
+}
+
+.node-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  fill: #8A94A6;
+  dominant-baseline: middle;
+}
+
+.status-feed {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid #1E2636;
+  padding-top: 14px;
+  min-height: 108px;
+}
+
+.feed-heading {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: #55627A;
+  margin-bottom: 10px;
+}
+
+.status-feed ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.feed-line {
+  display: flex;
+  gap: 10px;
+  font-size: 0.8rem;
+  animation: feedIn 0.35s ease-out;
+}
+
+@keyframes feedIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.feed-time {
+  font-family: 'JetBrains Mono', monospace;
+  color: #3DDC97;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.feed-text {
+  color: #A6AFC0;
+}
+
+.visual-tagline {
+  position: relative;
+  z-index: 1;
+  font-size: 0.85rem;
+  color: #55627A;
+  margin-top: 18px;
+  max-width: 30ch;
+  line-height: 1.5;
+}
+
+/* ============ SAĞ: Form paneli ============ */
+.login-form-panel {
+  flex: 1 1 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
 .login-card {
-  background-color: var(--bg-card);
   width: 100%;
-  max-width: 420px;
-  padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
+  max-width: 400px;
   animation: slideUpFade 0.4s ease-out;
 }
 
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .login-header {
-  text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
-.login-logo {
-  width: 64px;
-  height: 64px;
-  background-color: rgba(99, 102, 241, 0.1);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px auto;
+.login-eyebrow {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--brand-primary);
+  margin-bottom: 6px;
 }
 
 .login-header h2 {
-  font-size: 1.5rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 600;
   color: var(--text-main);
-  margin-bottom: 8px;
-}
-
-.login-header p {
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  letter-spacing: -0.01em;
 }
 
 .login-error {
   background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
-  padding: 12px;
+  padding: 11px 14px;
   border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 0.9rem;
-  text-align: center;
+  margin-bottom: 18px;
+  font-size: 0.88rem;
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .login-form .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .login-form label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
@@ -106,7 +259,7 @@
 
 .forgot-password {
   text-align: right;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .forgot-password a {
@@ -122,15 +275,15 @@
 
 .login-btn {
   width: 100%;
-  padding: 14px;
+  padding: 13px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 10px;
-  font-size: 1rem;
+  font-size: 0.98rem;
+  border-radius: 8px;
 }
 
-/* Yükleniyor Animasyonu */
 .loading-spinner {
   width: 20px;
   height: 20px;
@@ -141,15 +294,15 @@
 }
 
 .login-footer {
-  margin-top: 24px;
+  margin-top: 22px;
   text-align: center;
   border-top: 1px solid var(--border-color);
-  padding-top: 20px;
+  padding-top: 18px;
 }
 
 .login-footer p {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .login-footer a {
@@ -160,4 +313,23 @@
 
 .login-footer a:hover {
   color: var(--brand-primary);
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 860px) {
+  .login-visual {
+    display: none;
+  }
+  .login-form-panel {
+    padding: 40px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card, .feed-line, .node-pulse, .loading-spinner {
+    animation: none !important;
+  }
+  .pipeline-flow {
+    transition: none;
+  }
 }

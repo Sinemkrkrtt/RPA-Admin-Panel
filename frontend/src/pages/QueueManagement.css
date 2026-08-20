@@ -1,175 +1,227 @@
-/* --- MODAL (POP-UP) TASARIMI --- */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+/* =========================================================
+   İş Kuyruğu — akış (pipeline) odaklı görünüm
+   Ortak tablo/modal/toast stilleri BotManagement.css'ten gelir.
+   Burada yalnızca bu sayfaya özgü parçalar tanımlıdır.
+   ========================================================= */
+
+/* ---------- KUYRUK HATTI (hem özet hem filtre) ---------- */
+.pipeline {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.pipeline::-webkit-scrollbar { display: none; }
 
-.modal-content {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 450px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  animation: slideUp 0.3s ease-out;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h2 {
-  font-size: 1.25rem;
-  color: var(--text-main);
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: 6px;
-}
-
-.close-btn:hover {
-  background-color: var(--bg-body);
-  color: var(--text-main);
-}
-
-.modal-body {
-  padding: 24px;
-}
-
-.form-group {
+.stage {
+  flex: 1 1 0;
+  min-width: 128px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 24px;
+  padding: 10px 12px 9px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
 }
+.stage:hover { background: var(--bg-subtle); }
+.stage.on { background: var(--bg-subtle); border-color: var(--line-strong); }
 
-.form-group label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 12px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background-color: var(--bg-body);
-  color: var(--text-main);
-  font-size: 0.95rem;
-  outline: none;
-  width: 100%;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  border-color: var(--brand-primary);
-}
-
-.modal-actions {
+.stage-label {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.stage.on .stage-label { color: var(--ink-2); }
+
+.stage-count {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.stage.is-empty .stage-count { color: var(--ink-3); }
+
+.stage-meter {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.stage-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ink-3);
+  transition: width .5s cubic-bezier(.2, .8, .2, 1);
+}
+.stage.all .stage-meter span { background: var(--ink-2); }
+.stage.pending .stage-meter span { background: var(--ink-3); }
+.stage.processing .stage-meter span { background: var(--accent); }
+.stage.completed .stage-meter span { background: var(--ok); }
+.stage.failed .stage-meter span { background: var(--danger); }
+
+.stage.processing .stage-label svg { color: var(--accent); }
+.stage.completed .stage-label svg { color: var(--ok); }
+.stage.failed .stage-label svg { color: var(--danger); }
+
+.stage-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--line-strong);
+  flex-shrink: 0;
 }
 
-/* src/pages/QueueManagement.css */
-
-/* --- DURUMA GÖRE SATIR RENKLENDİRME --- */
-/* Hafif arka plan renkleri ile daha "Enterprise" bir görünüm */
-
-.data-table tbody tr {
-  transition: all 0.2s ease;
+/* ---------- SATIR RAYI ---------- */
+.rail-cell { width: 3px; padding: 0 0 0 14px !important; }
+.q-rail {
+  display: block;
+  width: 3px;
+  height: 30px;
+  border-radius: 2px;
+  background: var(--line-strong);
 }
+.q-rail.processing {
+  background: linear-gradient(180deg, var(--accent), var(--accent) 45%, transparent 45%, transparent 55%, var(--accent) 55%);
+  background-size: 100% 200%;
+  animation: rail-flow 1.4s linear infinite;
+}
+.q-rail.completed { background: var(--ok); }
+.q-rail.failed { background: var(--danger); }
 
-.data-table tbody tr.row-processing {
-  background-color: rgba(59, 130, 246, 0.05); /* Çok hafif Mavi */
-  border-left: 3px solid #3b82f6; /* Sol kenarda belirleyici çizgi */
-}
-.data-table tbody tr.row-processing:hover {
-  background-color: rgba(59, 130, 246, 0.1);
-}
-
-.data-table tbody tr.row-completed {
-  background-color: rgba(16, 185, 129, 0.05); /* Çok hafif Yeşil */
-  border-left: 3px solid #10b981;
-}
-.data-table tbody tr.row-completed:hover {
-  background-color: rgba(16, 185, 129, 0.1);
+@keyframes rail-flow {
+  from { background-position: 0 0; }
+  to { background-position: 0 -200%; }
 }
 
-.data-table tbody tr.row-failed {
-  background-color: rgba(239, 68, 68, 0.05); /* Çok hafif Kırmızı */
-  border-left: 3px solid #ef4444;
+/* ---------- GÖREV HÜCRESİ ---------- */
+.task-desc {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.data-table tbody tr.row-failed:hover {
-  background-color: rgba(239, 68, 68, 0.1);
+.task-meta {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
 }
+tr.is-done .task-desc { color: var(--ink-3); }
 
-/* --- BADGE (ROZET) İYİLEŞTİRMELERİ --- */
-.badge {
+.bot-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px; /* Rozetleri biraz daha dolgun yaptık */
+  padding: 3px 8px 3px 6px;
+  border: 1px solid var(--line);
   border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.85rem;
+  background: var(--bg-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.bot-chip svg { color: var(--ink-3); flex-shrink: 0; }
+
+/* ---------- ÖNCELİK: SİNYAL ÇUBUKLARI ---------- */
+.prio {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.prio .bars { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+.prio .bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--line-strong);
+}
+.prio .bars i:nth-child(1) { height: 5px; }
+.prio .bars i:nth-child(2) { height: 8px; }
+.prio .bars i:nth-child(3) { height: 12px; }
+
+.prio.high { color: var(--danger); }
+.prio.high .bars i { background: var(--danger); }
+.prio.normal { color: var(--ink-2); }
+.prio.normal .bars i:nth-child(-n+2) { background: var(--accent); }
+.prio.low .bars i:nth-child(1) { background: var(--ink-3); }
+
+/* ---------- DURUM ETİKETLERİ (App.css .tag üzerine) ---------- */
+.tag.pending { background: var(--bg-hover); color: var(--ink-3); }
+.tag.processing { background: var(--accent-soft); color: var(--accent); }
+.tag.completed { background: var(--ok-soft); color: var(--ok); }
+.tag.failed { background: var(--danger-soft); color: var(--danger); }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* İşleniyor durumu için özel mavi renk */
-.badge-primary {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #2563eb;
-}
+/* ---------- KÜÇÜK EKLER ---------- */
+.btn.icon-only { width: 32px; padding: 0; justify-content: center; }
 
-.badge-success {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #059669;
-}
-
-.badge-danger {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #dc2626;
-}
-
-.badge-neutral {
-  background-color: var(--bg-body);
-  color: var(--text-muted);
-}
-
-/* --- ÖNCELİK (PRIORITY) İYİLEŞTİRMELERİ --- */
-.priority {
+.toolbar-right {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  font-size: 0.85rem;
+  gap: 10px;
+  margin-left: auto;
+}
+.sort-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 
-.priority.high { color: #ef4444; }
-.priority.normal { color: #3b82f6; }
-.priority.low { color: var(--text-muted); }
+.modal-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.modal-note svg { color: var(--warn); flex-shrink: 0; }
+.modal-note a { color: var(--ink); font-weight: 600; }
+
+/* ---------- DUYARLILIK ---------- */
+@media (max-width: 900px) {
+  .stage { min-width: 118px; }
+  .stage-arrow { display: none; }
+  .task-desc { max-width: 260px; }
+}
+@media (max-width: 720px) {
+  .toolbar-right { width: 100%; }
+}

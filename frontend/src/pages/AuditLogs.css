@@ -1,0 +1,205 @@
+/* =========================================================
+   Denetim İzleri — kronolojik, değiştirilemez kayıt defteri
+   Ortak panel/buton/toast stilleri App.css & BotManagement.css'ten gelir.
+   ========================================================= */
+
+/* ---------- ARAÇ ÇUBUĞU ---------- */
+.aud-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+.aud-toolbar .search-box { flex: 1; min-width: 190px; max-width: 320px; }
+
+.aud-select {
+  height: 32px;
+  width: auto;
+  min-width: 148px;
+  padding: 0 30px 0 11px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background-color: var(--bg-subtle);
+  border-color: transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.aud-select:focus { background-color: var(--bg-surface); }
+.aud-select.on { color: var(--ink); font-weight: 500; background-color: var(--bg-surface); border-color: var(--line-strong); }
+
+.readonly-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--bg-subtle);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.readonly-chip svg { color: var(--ink-3); }
+
+/* ---------- KAYIT DEFTERİ ---------- */
+.ledger { padding-bottom: 6px; }
+
+.day-head {
+  position: sticky;
+  top: 56px;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 9px 18px;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.ledger > .day-block:first-child .day-head { border-top: none; }
+
+.day-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -.01em;
+}
+.day-raw {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.day-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Girdi satırı */
+.entry {
+  display: grid;
+  grid-template-columns: 46px 16px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 9px 18px;
+  transition: background-color .15s ease;
+}
+.entry:hover { background: var(--bg-subtle); }
+
+.entry-time {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  text-align: right;
+  padding-top: 7px;
+  white-space: nowrap;
+}
+
+/* Zaman omurgası */
+.spine { position: relative; display: flex; justify-content: center; }
+.spine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: -9px;
+  width: 1px;
+  background: var(--line);
+}
+.entry:last-child .spine::before { bottom: 50%; }
+
+.node {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--ink-3);
+  flex-shrink: 0;
+}
+.entry:hover .node { background: var(--bg-subtle); }
+.node.create { border-color: var(--ok); }
+.node.update { border-color: var(--accent); }
+.node.delete { border-color: var(--danger); background: var(--danger); }
+.node.auth { border-color: var(--warn); }
+
+.entry-body { min-width: 0; padding: 3px 0 2px; }
+
+.entry-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.aud-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.aud-avatar.tint-0 { background: var(--accent-soft); color: var(--accent); }
+.aud-avatar.tint-1 { background: var(--ok-soft); color: var(--ok); }
+.aud-avatar.tint-2 { background: var(--warn-soft); color: var(--warn); }
+.aud-avatar.tint-3 { background: var(--danger-soft); color: var(--danger); }
+.aud-avatar.tint-4 { background: var(--bg-hover); color: var(--ink-2); }
+
+.actor { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+.act-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--bg-hover);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.act-chip.create { background: var(--ok-soft); color: var(--ok); }
+.act-chip.update { background: var(--accent-soft); color: var(--accent); }
+.act-chip.delete { background: var(--danger-soft); color: var(--danger); }
+.act-chip.auth { background: var(--warn-soft); color: var(--warn); }
+
+.entry-detail {
+  margin-top: 3px;
+  padding-left: 30px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.entry-id {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--line-strong);
+  padding-top: 8px;
+  white-space: nowrap;
+}
+.entry:hover .entry-id { color: var(--ink-3); }
+
+/* ---------- DUYARLILIK ---------- */
+@media (max-width: 720px) {
+  .aud-toolbar .search-box { max-width: none; flex-basis: 100%; }
+  .aud-select { flex: 1; min-width: 0; }
+  .entry { grid-template-columns: 40px 16px minmax(0, 1fr); padding: 9px 14px; }
+  .entry-id { display: none; }
+  .entry-detail { padding-left: 0; }
+  .day-head { padding: 9px 14px; }
+}

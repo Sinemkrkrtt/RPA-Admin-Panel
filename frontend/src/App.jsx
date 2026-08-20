@@ -8,60 +8,65 @@ import SystemLogs from './pages/SystemLogs';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import SystemSettings from './pages/SystemSettings';
-import AuditLogs from './pages/AuditLogs'; // YENİ EKLENDİ
+import AuditLogs from './pages/AuditLogs';
 import './App.css';
 
-// Navbar bileşeni: Hangi sayfada olduğumuzu (useLocation) anlayıp o menüyü aktif yapar.
+const NAV_ITEMS = [
+  { path: '/', label: 'Genel Bakış' },
+  { path: '/bots', label: 'Robotlar' },
+  { path: '/queue', label: 'İş Kuyruğu' },
+  { path: '/logs', label: 'Loglar' },
+  { path: '/audit', label: 'Denetim' },
+  { path: '/users', label: 'Kullanıcılar' },
+  { path: '/settings', label: 'Ayarlar' },
+];
+
 function Navbar({ isDarkMode, toggleTheme }) {
-  const location = useLocation(); 
+  const location = useLocation();
 
   return (
-    <nav className="navbar">
-      <div className="nav-brand">
-        <Database size={24} className="brand-icon" />
-        <span>RPA Admin Merkezi</span>
-      </div>
-      
-      <div className="nav-links">
-        <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
-          Dashboard
+    <header className="topbar">
+      <div className="topbar-inner">
+        <Link to="/" className="brand">
+          <span className="brand-mark"><Database size={15} strokeWidth={2.2} /></span>
+          <span className="brand-name">RPA Admin</span>
+          <span className="env-chip">PROD</span>
         </Link>
-        <Link to="/bots" className={`nav-item ${location.pathname === '/bots' ? 'active' : ''}`}>
-          Robot Yönetimi
-        </Link>
-        <Link to="/queue" className={`nav-item ${location.pathname === '/queue' ? 'active' : ''}`}>
-          İş Kuyruğu
-        </Link>
-        <Link to="/logs" className={`nav-item ${location.pathname === '/logs' ? 'active' : ''}`}>
-          Log ve İzleme
-        </Link>
-        <Link to="/audit" className={`nav-item ${location.pathname === '/audit' ? 'active' : ''}`}>
-          Denetim İzleri {/* YENİ EKLENDİ */}
-        </Link>
-        <Link to="/users" className={`nav-item ${location.pathname === '/users' ? 'active' : ''}`}>
-          Kullanıcılar
-        </Link>
-       <Link to="/settings" className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}>
-        Ayarlar
-      </Link>
-      </div>
 
-      <div className="nav-actions">
-        {/* Yönlendirme işlemi için Link kullanıldı ve buton stili korundu */}
-        <Link to="/login" className="btn-primary" style={{ textDecoration: 'none' }}>
-          Giriş Yap
-        </Link>
-        
-        <div className="theme-toggle" onClick={toggleTheme}>
-          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        <nav className="nav-menu">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+              aria-current={location.pathname === item.path ? 'page' : undefined}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="nav-actions">
+          <button
+            className="icon-btn"
+            onClick={toggleTheme}
+            aria-label={isDarkMode ? 'Açık temaya geç' : 'Koyu temaya geç'}
+            title={isDarkMode ? 'Açık temaya geç' : 'Koyu temaya geç'}
+          >
+            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
+          <Link to="/login" className="btn-ink">Giriş yap</Link>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  );
 
   useEffect(() => {
     if (isDarkMode) {
@@ -71,23 +76,20 @@ function App() {
     }
   }, [isDarkMode]);
 
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  const toggleTheme = () => setIsDarkMode((v) => !v);
 
   return (
     <BrowserRouter>
       <div className="dashboard-container">
-        {/* Navbar her sayfada sabit kalacak */}
         <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-        
-        {/* Routes kısmı sayfa değiştiğinde içeriğin değiştiği yerdir */}
+
         <Routes>
-          {/* Dashboard bileşenine tema bilgisini prop olarak yolluyoruz ki grafik renkleri değişebilsin */}
           <Route path="/" element={<Dashboard isDarkMode={isDarkMode} />} />
           <Route path="/login" element={<Login />} />
           <Route path="/bots" element={<BotManagement />} />
           <Route path="/queue" element={<QueueManagement />} />
           <Route path="/logs" element={<SystemLogs />} />
-          <Route path="/audit" element={<AuditLogs />} /> {/* YENİ EKLENDİ */}
+          <Route path="/audit" element={<AuditLogs />} />
           <Route path="/users" element={<UserManagement />} />
           <Route path="/settings" element={<SystemSettings />} />
         </Routes>

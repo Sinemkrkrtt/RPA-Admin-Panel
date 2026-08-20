@@ -1,228 +1,374 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, CartesianGrid
 } from 'recharts';
-import { 
-  Activity, Server, Clock, AlertTriangle, 
-  CheckCircle, Bell, TrendingUp, TrendingDown, Loader, Download // Download ikonu eklendi
+import {
+  Server, Activity, Clock, Target, Bell, Download, RefreshCw,
+  AlertTriangle, AlertCircle, Info, Inbox, WifiOff
 } from 'lucide-react';
 
-const PIE_COLORS = ['#6366f1', '#94a3b8']; 
+const API = 'http://localhost:5000/api';
+
+const EMPTY = {
+  kpi: { totalBots: 0, activeBots: 0, queuedTasks: 0, successRate: 0 },
+  weeklyData: [],
+  totalData: []
+};
+
+const nf = new Intl.NumberFormat('tr-TR');
+const fmt = (n) => nf.format(Number(n) || 0);
+
+/* Grafik renkleri temaya göre JS tarafında çözülüyor (SVG'de değişken riski yok) */
+const chartTheme = (dark) => ({
+  grid: dark ? '#26262b' : '#eceae3',
+  axis: dark ? '#74747e' : '#8a8a93',
+  ok: dark ? '#8f88ff' : '#4b3fd6',
+  fail: dark ? '#f2686c' : '#d1383d'
+});
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tooltip">
+      <div className="chart-tooltip-title">{label}</div>
+      {payload.map((p) => (
+        <div className="chart-tooltip-row" key={p.dataKey ?? p.name}>
+          <span className="series-swatch" style={{ background: p.color || p.payload?.fill }} />
+          <span>{p.name}</span>
+          <span className="v">{fmt(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <main className="main-content">
+      <div className="page-head">
+        <div>
+          <div className="skel" style={{ width: 190, height: 24 }} />
+          <div className="skel" style={{ width: 260, height: 13, marginTop: 10 }} />
+        </div>
+        <div className="skel" style={{ width: 210, height: 32 }} />
+      </div>
+
+      <div className="kpi-grid">
+        {[0, 1, 2, 3].map((i) => (
+          <div className="kpi-card" key={i}>
+            <div className="kpi-header">
+              <div className="skel" style={{ width: 96, height: 11 }} />
+              <div className="skel" style={{ width: 30, height: 30, borderRadius: 8 }} />
+            </div>
+            <div>
+              <div className="skel" style={{ width: 74, height: 30 }} />
+              <div className="skel" style={{ height: 3, marginTop: 12 }} />
+              <div className="skel" style={{ width: 130, height: 12, marginTop: 11 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="charts-wrapper">
+        <div className="panel"><div className="panel-body pad"><div className="skel" style={{ height: 288 }} /></div></div>
+        <div className="panel"><div className="panel-body pad"><div className="skel" style={{ height: 288 }} /></div></div>
+      </div>
+    </main>
+  );
+}
 
 export default function Dashboard({ isDarkMode }) {
   const [dashboardData, setDashboardData] = useState(null);
+  const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/dashboard');
-        if (response.ok) {
-          const data = await response.json();
-          setDashboardData(data);
-        }
-      } catch (error) {
-        console.error("Dashboard verisi çekilemedi:", error);
-      } finally {
-        setIsLoading(false);
+  const fetchAllData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const [dashRes, logsRes] = await Promise.all([
+        fetch(`${API}/dashboard`),
+        fetch(`${API}/logs`)
+      ]);
+
+      if (!dashRes.ok) throw new Error('dashboard');
+      setDashboardData(await dashRes.json());
+
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setLogs(Array.isArray(logsData) ? logsData.slice(0, 5) : []);
       }
-    };
 
-    fetchDashboardData();
+      setFailed(false);
+      setUpdatedAt(new Date());
+    } catch (error) {
+      console.error('Veriler çekilemedi:', error);
+      setFailed(true);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
 
-  // --- YENİ EKLENEN: CSV OLARAK DIŞA AKTARMA FONKSİYONU ---
+  useEffect(() => { fetchAllData(); }, [fetchAllData]);
+
+  const data = dashboardData || EMPTY;
+  const t = useMemo(() => chartTheme(isDarkMode), [isDarkMode]);
+
+  const totalData = useMemo(
+    () => (data.totalData || []).map((d) => ({
+      name: d.name ?? d.label ?? '—',
+      value: Number(d.value) || 0
+    })),
+    [data.totalData]
+  );
+
+  const grandTotal = totalData.reduce((s, d) => s + d.value, 0);
+  const donutColors = [t.ok, t.fail, t.axis];
+
+  const { totalBots = 0, activeBots = 0, queuedTasks = 0, successRate = 0 } = data.kpi || {};
+  const activeRatio = totalBots ? Math.round((activeBots / totalBots) * 100) : 0;
+  const idleBots = Math.max(totalBots - activeBots, 0);
+
   const handleExportCSV = () => {
-    if (!dashboardData) return;
-
-    // CSV formatında başlıklar
-    let csvContent = "Gun,Basarili Islem,Hatali Islem\n";
-
-    // Tablodaki her bir haftalık veri satırını CSV formatına çeviriyoruz
-    dashboardData.weeklyData.forEach(row => {
-      csvContent += `${row.gun},${row.Basarili},${row.Hatali}\n`;
+    if (!data.weeklyData?.length) return;
+    let csv = 'Gun,Basarili Islem,Hatali Islem\n';
+    data.weeklyData.forEach((row) => {
+      csv += `${row.gun},${row.Basarili},${row.Hatali}\n`;
     });
-
-    // Blob objesi oluşturma (Türkçe karakter sorunu olmasın diye \uFEFF ekliyoruz)
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    // Tarayıcıda sahte bir indirme linki (a tag) oluşturup tıklatıyoruz
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Haftalik_Islem_Raporu_${new Date().toLocaleDateString('tr-TR')}.csv`);
-    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Haftalik_Islem_Raporu_${new Date().toLocaleDateString('tr-TR')}.csv`;
     document.body.appendChild(link);
     link.click();
-    
-    // İşlem bitince sahte linki temizle
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-  // --------------------------------------------------------
 
-  if (isLoading) {
-    return (
-      <main className="main-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', color: 'var(--text-muted)' }}>
-          <Loader size={40} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-          <p>Dashboard verileri yükleniyor...</p>
-        </div>
-      </main>
-    );
-  }
-
-  const data = dashboardData || {
-    kpi: { totalBots: 0, activeBots: 0, queuedTasks: 0, successRate: 0 },
-    weeklyData: [],
-    totalData: []
-  };
+  if (isLoading) return <LoadingSkeleton />;
 
   return (
     <main className="main-content">
-      {/* KPI KARTLARI */}
+      {/* SAYFA BAŞLIĞI */}
+      <div className="page-head rise">
+        <div>
+          <h1 className="page-title">Genel Bakış</h1>
+          <div className="page-sub">
+            <span className={`status-dot ${failed ? 'is-down' : ''}`} />
+            {failed
+              ? 'Sunucuya bağlanılamıyor'
+              : <>Son güncelleme <span className="mono">{updatedAt?.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></>}
+          </div>
+        </div>
+
+        <div className="head-actions">
+          <button className="btn" onClick={fetchAllData} disabled={isRefreshing}>
+            <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} />
+            {isRefreshing ? 'Yenileniyor' : 'Yenile'}
+          </button>
+          <button className="btn-ink" onClick={handleExportCSV} disabled={!data.weeklyData?.length}>
+            <Download size={14} /> CSV indir
+          </button>
+        </div>
+      </div>
+
+      {failed && (
+        <div className="banner rise" style={{ '--d': '40ms' }}>
+          <WifiOff size={16} />
+          <span>Veriler {API} adresinden alınamadı. Sunucunun çalıştığını kontrol edin.</span>
+          <button className="btn" onClick={fetchAllData}>Tekrar dene</button>
+        </div>
+      )}
+
+      {/* GÖSTERGE KARTLARI */}
       <div className="kpi-grid">
-        <div className="kpi-card">
+        <div className="kpi-card rise" style={{ '--d': '60ms' }}>
           <div className="kpi-header">
-            <h3>Toplam Bot Sayısı</h3>
-            <div className="kpi-icon-box blue"><Server size={22} /></div>
+            <span className="eyebrow">Kayıtlı robot</span>
+            <span className="kpi-icon-box blue"><Server size={16} /></span>
           </div>
-          <div className="kpi-body">
-            <h2>{data.kpi.totalBots}</h2>
-            <span className="trend positive"><TrendingUp size={16}/> Güncel Veri</span>
-          </div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <h3>Aktif / Çalışan</h3>
-            <div className="kpi-icon-box green"><Activity size={22} /></div>
-          </div>
-          <div className="kpi-body">
-            <h2>{data.kpi.activeBots}</h2>
-            <span className="trend neutral">Canlı İzleme</span>
+          <div>
+            <div className="kpi-value num">{fmt(totalBots)}</div>
+            <div className="kpi-meter"><span style={{ width: `${activeRatio}%` }} /></div>
+            <div className="kpi-foot"><b>{fmt(activeBots)}</b> çalışıyor · <b>{fmt(idleBots)}</b> beklemede</div>
           </div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card rise" style={{ '--d': '110ms' }}>
           <div className="kpi-header">
-            <h3>Kuyruktaki İşler</h3>
-            <div className="kpi-icon-box orange"><Clock size={22} /></div>
+            <span className="eyebrow">Anlık çalışan</span>
+            <span className="kpi-icon-box green"><Activity size={16} /></span>
           </div>
-          <div className="kpi-body">
-            <h2>{data.kpi.queuedTasks}</h2>
-            <span className="trend negative"><TrendingDown size={16}/> Tahmini</span>
+          <div>
+            <div className="kpi-value num">{fmt(activeBots)}</div>
+            <div className="kpi-meter ok"><span style={{ width: `${activeRatio}%` }} /></div>
+            <div className="kpi-foot">Filonun <b>%{activeRatio}</b>'i aktif</div>
           </div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card rise" style={{ '--d': '160ms' }}>
           <div className="kpi-header">
-            <h3>Genel Başarı Oranı</h3>
-            <div className="kpi-icon-box red"><CheckCircle size={22} /></div>
+            <span className="eyebrow">İş kuyruğu</span>
+            <span className="kpi-icon-box orange"><Clock size={16} /></span>
           </div>
-          <div className="kpi-body">
-            <h2>%{data.kpi.successRate}</h2>
-            <span className="trend positive"><TrendingUp size={16}/> Sistem Ortalaması</span>
+          <div>
+            <div className="kpi-value num">{fmt(queuedTasks)}</div>
+            <div className="kpi-meter warn"><span style={{ width: queuedTasks > 0 ? '100%' : '0%' }} /></div>
+            <div className="kpi-foot">{queuedTasks > 0 ? 'İşlenmeyi bekleyen görev' : 'Kuyruk boş'}</div>
+          </div>
+        </div>
+
+        <div className="kpi-card rise" style={{ '--d': '210ms' }}>
+          <div className="kpi-header">
+            <span className="eyebrow">Başarı oranı</span>
+            <span className="kpi-icon-box red"><Target size={16} /></span>
+          </div>
+          <div>
+            <div className="kpi-value num">{successRate}<span className="unit">%</span></div>
+            <div className={`kpi-meter ${successRate >= 90 ? 'ok' : successRate >= 70 ? 'warn' : ''}`}>
+              <span style={{ width: `${Math.min(Math.max(successRate, 0), 100)}%` }} />
+            </div>
+            <div className="kpi-foot">Tamamlanan tüm işlemler</div>
           </div>
         </div>
       </div>
 
-      {/* GRAFİKLER ALANI */}
+      {/* GRAFİKLER */}
       <div className="charts-wrapper">
-        <div className="chart-box main-chart">
-          {/* YENİ EKLENEN: Başlık ve İndirme Butonu Yanyana */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h2 className="section-title" style={{ margin: 0 }}>Haftalık İşlem Özeti</h2>
-            <button 
-              className="btn-primary" 
-              onClick={handleExportCSV}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', fontSize: '13px' }}
-            >
-              <Download size={16} /> Raporu İndir (CSV)
-            </button>
+        <section className="panel rise" style={{ '--d': '260ms' }}>
+          <div className="panel-head">
+            <div>
+              <h2 className="panel-title">Haftalık işlem hacmi</h2>
+              <p className="panel-desc">Son 7 günün gün bazlı sonuçları</p>
+            </div>
+            <div className="series-keys">
+              <span className="series-key"><i className="series-swatch" style={{ background: t.ok }} /> Başarılı</span>
+              <span className="series-key"><i className="series-swatch" style={{ background: t.fail }} /> Hatalı</span>
+            </div>
           </div>
-          {/* ------------------------------------------- */}
-          
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={data.weeklyData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="gun" axisLine={false} tickLine={false} tick={{ fill: isDarkMode ? '#a1a1aa' : '#64748b', fontSize: 13 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: isDarkMode ? '#a1a1aa' : '#64748b', fontSize: 13 }} />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}} 
-                  contentStyle={{ backgroundColor: isDarkMode ? '#141415' : '#ffffff', border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`, borderRadius: '12px', color: isDarkMode ? '#f8fafc' : '#0f172a', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 14 }} />
-                <Bar dataKey="Basarili" name="Başarılı" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={26} />
-                <Bar dataKey="Hatali" name="Hatalı" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={26} />
-              </BarChart>
-            </ResponsiveContainer>
+
+          <div className="panel-body">
+            <div style={{ width: '100%', height: 292 }}>
+              <ResponsiveContainer>
+                <BarChart data={data.weeklyData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }} barGap={5}>
+                  <CartesianGrid vertical={false} stroke={t.grid} strokeDasharray="3 4" />
+                  <XAxis
+                    dataKey="gun"
+                    axisLine={false}
+                    tickLine={false}
+                    dy={8}
+                    tick={{ fill: t.axis, fontSize: 11 }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    width={34}
+                    tick={{ fill: t.axis, fontSize: 11 }}
+                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: t.grid, opacity: 0.35 }} />
+                  <Bar dataKey="Basarili" name="Başarılı" fill={t.ok} radius={[3, 3, 0, 0]} maxBarSize={18} />
+                  <Bar dataKey="Hatali" name="Hatalı" fill={t.fail} radius={[3, 3, 0, 0]} maxBarSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
+        </section>
+
+        <section className="panel rise" style={{ '--d': '310ms' }}>
+          <div className="panel-head">
+            <div>
+              <h2 className="panel-title">Tüm zamanlar</h2>
+              <p className="panel-desc">Toplam işlem dağılımı</p>
+            </div>
+          </div>
+
+          <div className="panel-body pad">
+            <div className="donut-wrap" style={{ width: '100%', height: 190 }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={totalData}
+                    innerRadius={62}
+                    outerRadius={88}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {totalData.map((entry, i) => (
+                      <Cell key={entry.name} fill={donutColors[i % donutColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div className="donut-center">
+                <strong>{fmt(grandTotal)}</strong>
+                <span className="eyebrow">Toplam işlem</span>
+              </div>
+            </div>
+
+            <div className="readout">
+              {totalData.map((entry, i) => (
+                <div className="readout-row" key={entry.name}>
+                  <i className="series-swatch" style={{ background: donutColors[i % donutColors.length] }} />
+                  <span>{entry.name}</span>
+                  <span className="v">{fmt(entry.value)}</span>
+                  <span className="p">%{grandTotal ? ((entry.value / grandTotal) * 100).toFixed(1) : '0.0'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* SİSTEM KAYITLARI */}
+      <section className="panel rise" style={{ '--d': '360ms' }}>
+        <div className="panel-head">
+          <div>
+            <h2 className="panel-title"><Bell size={15} /> Sistem kayıtları</h2>
+            <p className="panel-desc">En son gelen 5 uyarı</p>
+          </div>
+          <Link className="btn" to="/logs">Tüm loglar</Link>
         </div>
 
-        <div className="chart-box side-chart">
-          <h2 className="section-title">Tüm Zamanlar</h2>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={data.totalData}
-                  innerRadius={75}
-                  outerRadius={105}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {data.totalData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: isDarkMode ? '#141415' : '#ffffff', border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`, borderRadius: '12px', color: isDarkMode ? '#f8fafc' : '#0f172a' }}
-                />
-                <Legend iconType="circle" verticalAlign="bottom" wrapperStyle={{ fontSize: 14 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-      {/* SİSTEM BİLDİRİMLERİ (LOG) */}
-      <div className="alerts-section">
-        <div className="section-header">
-          <h2 className="section-title"><Bell size={20} /> Sistem Kayıtları & Uyarılar</h2>
-          <button className="btn-text">Tümünü Gör</button>
-        </div>
-        
-        <ul className="alerts-list">
-          <li className="alert-item error">
-            <div className="alert-icon"><AlertTriangle size={18} /></div>
-            <div className="alert-content">
-              <strong>Kritik Gecikme</strong>
-              <p>Fatura_Botu_v2 45 dakikadır sunucuya yanıt vermiyor. Lütfen port bağlantılarını kontrol edin.</p>
-            </div>
-            <span className="alert-time">10 dk önce</span>
-          </li>
-          
-          <li className="alert-item warning">
-            <div className="alert-icon"><Clock size={18} /></div>
-            <div className="alert-content">
-              <strong>Yüksek İş Kuyruğu</strong>
-              <p>İK_İşe_Alım_Süreci kuyruğunda 50'den fazla bekleyen işlem birikti.</p>
-            </div>
-            <span className="alert-time">1 saat önce</span>
-          </li>
+        {logs.length > 0 ? (
+          <ul className="log-list">
+            {logs.map((log, i) => {
+              const type = String(log.log_type || '').toLowerCase();
+              const level = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info';
+              const Icon = level === 'error' ? AlertTriangle : level === 'warning' ? AlertCircle : Info;
 
-          <li className="alert-item info">
-            <div className="alert-icon"><Activity size={18} /></div>
-            <div className="alert-content">
-              <strong>Sistem Güncellemesi</strong>
-              <p>Yeni RPA çekirdek güncellemesi (v1.4.2) başarıyla tamamlandı.</p>
-            </div>
-            <span className="alert-time">Dün, 14:30</span>
-          </li>
-        </ul>
-      </div>
+              return (
+                <li className={`log-row ${level}`} key={log.id ?? i}>
+                  <span className="log-rail" />
+                  <span className="log-icon"><Icon size={16} /></span>
+                  <div className="log-body">
+                    <div className="log-top">
+                      <span className="log-bot">{log.bot_name}</span>
+                      <span className={`tag ${level}`}>{log.log_type}</span>
+                    </div>
+                    <div className="log-msg" title={log.message}>{log.message}</div>
+                  </div>
+                  <span className="log-time">{log.created_at}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="empty">
+            <span className="empty-icon"><Inbox size={18} /></span>
+            <strong>Kayıt yok</strong>
+            <p>Robotlar son çalışmalarında uyarı üretmedi. Yeni kayıtlar burada görünecek.</p>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

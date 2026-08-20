@@ -205,44 +205,81 @@ app.delete('/api/robots/:id', async (req, res) => {
  * /api/dashboard:
  *   get:
  *     summary: Dashboard istatistikleri
- *     description: Ana sayfa için gerekli olan KPI kart verilerini ve grafik bilgilerini getirir.
+ *     description: Ana sayfa için gerekli olan KPI kart verilerini ve grafik bilgilerini veritabanından dinamik çeker.
  *     responses:
  *       200:
  *         description: İstatistiksel veriler başarıyla çekildi.
  */
 app.get('/api/dashboard', async (req, res) => {
   try {
-    const totalResult = await pool.query("SELECT COUNT(*) FROM robots");
-    const activeResult = await pool.query("SELECT COUNT(*) FROM robots WHERE status = 'Running'");
-    const stoppedResult = await pool.query("SELECT COUNT(*) FROM robots WHERE status = 'Stopped'");
+    // 1. Robot İstatistikleri (Toplam ve Çalışan)
+    const botsRes = await pool.query(
+      "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Running' THEN 1 ELSE 0 END) as active FROM robots"
+    );
+    const totalBots = parseInt(botsRes.rows[0].total) || 0;
+    const activeBots = parseInt(botsRes.rows[0].active) || 0;
 
-    const totalBots = parseInt(totalResult.rows[0].count);
-    const activeBots = parseInt(activeResult.rows[0].count);
-    const stoppedBots = parseInt(stoppedResult.rows[0].count);
+    // 2. İş (Task) İstatistikleri ve Başarı Oranı
+    const tasksRes = await pool.query("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
+    let queuedTasks = 0, completedTasks = 0, failedTasks = 0;
 
-    const dashboardData = {
-      kpi: {
-        totalBots: totalBots,
-        activeBots: activeBots,
-        queuedTasks: (totalBots - activeBots - stoppedBots) * 15, 
-        successRate: 94.2
-      },
-      weeklyData: [
-        { gun: 'Pzt', Basarili: 120, Hatali: 12 },
-        { gun: 'Sal', Basarili: 132, Hatali: 8 },
-        { gun: 'Çar', Basarili: 101, Hatali: 15 },
-        { gun: 'Per', Basarili: 143, Hatali: 5 },
-        { gun: 'Cum', Basarili: 190, Hatali: 22 },
-        { gun: 'Cmt', Basarili: 65, Hatali: 3 },
-        { gun: 'Paz', Basarili: 70, Hatali: 5 },
-      ],
-      totalData: [
-        { name: 'Başarılı İşlem', value: 821 },
-        { name: 'Hatalı İşlem', value: 70 },
-      ]
+    tasksRes.rows.forEach(row => {
+      if (row.status === 'Pending') queuedTasks = parseInt(row.count);
+      if (row.status === 'Completed') completedTasks = parseInt(row.count);
+      if (row.status === 'Failed' || row.status === 'Error') failedTasks = parseInt(row.count);
+    });
+
+    const totalProcessed = completedTasks + failedTasks;
+    const successRate = totalProcessed > 0 ? ((completedTasks / totalProcessed) * 100).toFixed(1) : 0;
+
+    // 3. Haftalık Bar Grafiği Verisi (Son işleri günlere göre gruplama)
+    const allTasksRes = await pool.query("SELECT status, created_at FROM tasks");
+    
+    // Günlük sayaçlar (Varsayılan şablon)
+    const weekDays = { 
+      'Pzt': { Basarili: 0, Hatali: 0 }, 'Sal': { Basarili: 0, Hatali: 0 }, 
+      'Çar': { Basarili: 0, Hatali: 0 }, 'Per': { Basarili: 0, Hatali: 0 }, 
+      'Cum': { Basarili: 0, Hatali: 0 }, 'Cmt': { Basarili: 0, Hatali: 0 }, 
+      'Paz': { Basarili: 0, Hatali: 0 } 
     };
+    const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
-    res.json(dashboardData);
+    allTasksRes.rows.forEach(t => {
+      if(!t.created_at) return;
+      
+      // "20.08.2026 17:23" formatından tarihi parse etme
+      const [datePart] = t.created_at.split(' ');
+      if (!datePart) return;
+      const [day, month, year] = datePart.split('.');
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      
+      if(isNaN(dateObj)) return;
+      
+      const dayStr = dayNames[dateObj.getDay()];
+      
+      if (t.status === 'Completed') weekDays[dayStr].Basarili += 1;
+      if (t.status === 'Failed' || t.status === 'Error') weekDays[dayStr].Hatali += 1;
+    });
+
+    const weeklyDataArray = Object.keys(weekDays).map(key => ({
+      gun: key,
+      Basarili: weekDays[key].Basarili,
+      Hatali: weekDays[key].Hatali
+    }));
+
+    // 4. Tüm Zamanlar Pasta (Pie) Grafiği Verisi
+    const totalDataArray = [
+      { name: 'Başarılı İşlem', value: completedTasks },
+      { name: 'Hatalı İşlem', value: failedTasks },
+    ];
+
+    // Tüm hesaplamaları Frontend'e JSON olarak fırlat
+    res.json({
+      kpi: { totalBots, activeBots, queuedTasks, successRate },
+      weeklyData: weeklyDataArray,
+      totalData: totalDataArray
+    });
+
   } catch (err) {
     console.error("Dashboard verisi çekilirken hata:", err);
     res.status(500).json({ error: 'Dashboard verisi alınamadı' });
