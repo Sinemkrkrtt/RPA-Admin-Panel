@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './AuditLogs.css';
 
-const API = 'http://localhost:5000/api/audit-logs';
+const API = 'https://rpa-admin-panel.onrender.com/api/audit-logs';
 
 /* Eylem metninden kategori çıkarımı — backend'de tip alanı yok */
 const CATEGORIES = [

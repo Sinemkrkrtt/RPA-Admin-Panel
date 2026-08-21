@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './SystemLogs.css';
 
-const API = 'http://localhost:5000/api/logs';
+const API = 'https://rpa-admin-panel.onrender.com/api/logs';
 const POLL_MS = 5000;
 const STREAM_LIMIT = 120;
 const STRIP_LIMIT = 64;

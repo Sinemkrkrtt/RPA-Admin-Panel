@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './UserManagement.css';
 
-const API = 'http://localhost:5000/api/users';
+const API = 'https://rpa-admin-panel.onrender.com/api/users';
 
 /* Rollerin yetki gücü soldan sağa artar */
 const ROLES = [

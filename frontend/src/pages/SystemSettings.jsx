@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './SystemSettings.css';
 
-const API = 'http://localhost:5000/api/settings';
+const API = 'https://rpa-admin-panel.onrender.com/api/settings';
 
 const DEFAULTS = {
   maintenance_mode: false,

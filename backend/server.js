@@ -45,7 +45,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:5000',
+     url: 'https://rpa-admin-panel.onrender.com',
       },
     ],
   },

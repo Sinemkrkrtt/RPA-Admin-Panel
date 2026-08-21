@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './BotManagement.css';
 
-const API = 'http://localhost:5000/api/robots';
+const API = 'https://rpa-admin-panel.onrender.com/api/robots';
 
 /* Backend kapalıyken arayüzün boş kalmaması için örnek kayıt */
 const FALLBACK = [

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import './QueueManagement.css';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://rpa-admin-panel.onrender.com/api';
 
 const STAGES = [
   { key: 'All', label: 'Tümü', icon: ListTodo },
