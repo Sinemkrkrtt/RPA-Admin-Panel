@@ -9,6 +9,7 @@ import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import SystemSettings from './pages/SystemSettings';
 import AuditLogs from './pages/AuditLogs';
+import ProtectedRoute from './pages/ProtectedRoute';
 import './App.css';
 
 const NAV_ITEMS = [
@@ -86,6 +87,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard isDarkMode={isDarkMode} />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/" element={<ProtectedRoute><Dashboard isDarkMode={isDarkMode} /></ProtectedRoute>} />
           <Route path="/bots" element={<BotManagement />} />
           <Route path="/queue" element={<QueueManagement />} />
           <Route path="/logs" element={<SystemLogs />} />

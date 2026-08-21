@@ -42,20 +42,37 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+ const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Backend Auth sistemi kurulana kadar basit bir simülasyon
-    setTimeout(() => {
-      if (email === 'admin@rpa.com' && password === '123456') {
+    try {
+      // Backend'e (Node.js) email ve şifreyi gönderiyoruz
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Backend'den 'ok' geldiyse ve token verildiyse, bunu tarayıcının hafızasına kaydet
+        localStorage.setItem('token', data.token);
+        
+        // Başarılı giriş sonrası ana sayfaya yönlendir
         navigate('/');
       } else {
-        setError('E-posta adresi veya şifre hatalı. Lütfen tekrar deneyin.');
-        setIsLoading(false);
+        // Hatalı şifre veya kullanıcı yoksa backend'den gelen mesajı ekrana bas
+        setError(data.message || 'E-posta adresi veya şifre hatalı. Lütfen tekrar deneyin.');
       }
-    }, 1200);
+    } catch (err) {
+      console.error("Giriş hatası:", err);
+      setError('Sunucuya bağlanılamadı. Lütfen bağlantınızı kontrol edin.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

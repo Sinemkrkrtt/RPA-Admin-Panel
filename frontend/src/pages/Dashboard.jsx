@@ -8,6 +8,7 @@ import {
   Server, Activity, Clock, Target, Bell, Download, RefreshCw,
   AlertTriangle, AlertCircle, Info, Inbox, WifiOff
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 
 const API = 'http://localhost:5000/api';
 
@@ -114,7 +115,27 @@ export default function Dashboard({ isDarkMode }) {
     }
   }, []);
 
-  useEffect(() => { fetchAllData(); }, [fetchAllData]);
+useEffect(() => {
+    // 1. Sayfa ilk açıldığında verileri normal şekilde çek
+    fetchAllData();
+
+    // 2. Backend ile gerçek zamanlı (WebSocket) köprüsü kur
+    const socket = io('http://localhost:5000');
+
+    // 3. Backend'den "dashboard_update" sinyali gelirse, verileri sessizce arka planda yenile
+    socket.on('dashboard_update', () => {
+      console.log('⚡ Gerçek zamanlı veri güncellemesi yakalandı!');
+      fetchAllData();
+    });
+
+    // 4. Sadece yeni bir log geldiğinde, tabloyu baştan çekmek yerine log listesinin en üstüne ekle
+    socket.on('new_log', (newLog) => {
+      setLogs((prevLogs) => [newLog, ...prevLogs].slice(0, 5));
+    });
+
+    // Sayfa değiştirilirse (Unmount), dinlemeyi bırakarak belleği temizle (Memory Leak önlemi)
+    return () => socket.disconnect();
+  }, [fetchAllData]);
 
   const data = dashboardData || EMPTY;
   const t = useMemo(() => chartTheme(isDarkMode), [isDarkMode]);

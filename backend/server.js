@@ -3,18 +3,32 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const nodemailer = require('nodemailer'); 
 const cron = require('node-cron');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+// --- YENİ EKLENEN: SOCKET.IO KURULUMU ---
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Express'i HTTP sunucusu ile sarıp Socket.io'yu başlatıyoruz
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*' } // React'tan gelen bağlantılara izin ver
+});
+
+// io objesini rotaların içinde kullanabilmek için Express'e set ediyoruz
+app.set('io', io);
+// ----------------------------------------
+
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'rpa_admin_db',
-  password: 'mysecretpassword',
-  port: 5433,
+  connectionString: 'postgresql://postgres.ueaopbwoyoznldndltmc:Arsvh.141204@aws-0-eu-central-1.pooler.supabase.com:6543/postgres',
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 const swaggerUi = require('swagger-ui-express');
@@ -41,7 +55,7 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// --- YENİ EKLENEN E-POSTA SERVİS FONKSİYONU ---
+// E-POSTA SERVİS FONKSİYONU
 async function sendAlertEmail(subject, htmlContent) {
   try {
     const result = await pool.query("SELECT config_data FROM settings WHERE id = 1");
@@ -88,17 +102,12 @@ async function sendAlertEmail(subject, htmlContent) {
     console.error("E-posta gönderim hatası:", error);
   }
 }
-// ----------------------------------------------
 
 /**
  * @swagger
  * /api/test:
  *   get:
  *     summary: Veritabanı bağlantı testi
- *     description: Sistemin PostgreSQL veritabanına bağlanıp bağlanmadığını kontrol eder.
- *     responses:
- *       200:
- *         description: Bağlantı başarılı mesajı ve sunucu saati döner.
  */
 app.get('/api/test', async (req, res) => {
   try {
@@ -115,10 +124,6 @@ app.get('/api/test', async (req, res) => {
  * /api/robots:
  *   get:
  *     summary: Tüm robotları listeler
- *     description: Sistemde kayıtlı olan tüm RPA botlarını getirir.
- *     responses:
- *       200:
- *         description: Başarılı bir şekilde robot listesi döndürüldü.
  */
 app.get('/api/robots', async (req, res) => {
   try {
@@ -135,25 +140,6 @@ app.get('/api/robots', async (req, res) => {
  * /api/robots:
  *   post:
  *     summary: Yeni robot ekler
- *     description: Sisteme yeni bir RPA botu kaydeder.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               version:
- *                 type: string
- *               schedule:
- *                 type: string
- *               description:
- *                 type: string
- *     responses:
- *       201:
- *         description: Robot başarıyla eklendi.
  */
 app.post('/api/robots', async (req, res) => {
   try {
@@ -166,6 +152,7 @@ app.post('/api/robots', async (req, res) => {
       [name, version || '1.0.0', schedule || 'Yok', description || '']
     );
 
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.status(201).json(newRobot.rows[0]);
   } catch (err) {
     console.error("Robot kaydedilirken hata:", err);
@@ -178,21 +165,13 @@ app.post('/api/robots', async (req, res) => {
  * /api/robots/{id}:
  *   delete:
  *     summary: Robot siler
- *     description: ID'si verilen botu sistemden tamamen siler.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Robot başarıyla silindi.
  */
 app.delete('/api/robots/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query("DELETE FROM robots WHERE id = $1", [id]);
+    
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.json({ message: 'Robot başarıyla silindi' });
   } catch (err) {
     console.error("Robot silinirken hata:", err);
@@ -205,21 +184,15 @@ app.delete('/api/robots/:id', async (req, res) => {
  * /api/dashboard:
  *   get:
  *     summary: Dashboard istatistikleri
- *     description: Ana sayfa için gerekli olan KPI kart verilerini ve grafik bilgilerini veritabanından dinamik çeker.
- *     responses:
- *       200:
- *         description: İstatistiksel veriler başarıyla çekildi.
  */
 app.get('/api/dashboard', async (req, res) => {
   try {
-    // 1. Robot İstatistikleri (Toplam ve Çalışan)
     const botsRes = await pool.query(
       "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Running' THEN 1 ELSE 0 END) as active FROM robots"
     );
     const totalBots = parseInt(botsRes.rows[0].total) || 0;
     const activeBots = parseInt(botsRes.rows[0].active) || 0;
 
-    // 2. İş (Task) İstatistikleri ve Başarı Oranı
     const tasksRes = await pool.query("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
     let queuedTasks = 0, completedTasks = 0, failedTasks = 0;
 
@@ -232,10 +205,8 @@ app.get('/api/dashboard', async (req, res) => {
     const totalProcessed = completedTasks + failedTasks;
     const successRate = totalProcessed > 0 ? ((completedTasks / totalProcessed) * 100).toFixed(1) : 0;
 
-    // 3. Haftalık Bar Grafiği Verisi (Son işleri günlere göre gruplama)
     const allTasksRes = await pool.query("SELECT status, created_at FROM tasks");
     
-    // Günlük sayaçlar (Varsayılan şablon)
     const weekDays = { 
       'Pzt': { Basarili: 0, Hatali: 0 }, 'Sal': { Basarili: 0, Hatali: 0 }, 
       'Çar': { Basarili: 0, Hatali: 0 }, 'Per': { Basarili: 0, Hatali: 0 }, 
@@ -246,13 +217,10 @@ app.get('/api/dashboard', async (req, res) => {
 
     allTasksRes.rows.forEach(t => {
       if(!t.created_at) return;
-      
-      // "20.08.2026 17:23" formatından tarihi parse etme
       const [datePart] = t.created_at.split(' ');
       if (!datePart) return;
       const [day, month, year] = datePart.split('.');
       const dateObj = new Date(`${year}-${month}-${day}`);
-      
       if(isNaN(dateObj)) return;
       
       const dayStr = dayNames[dateObj.getDay()];
@@ -267,13 +235,11 @@ app.get('/api/dashboard', async (req, res) => {
       Hatali: weekDays[key].Hatali
     }));
 
-    // 4. Tüm Zamanlar Pasta (Pie) Grafiği Verisi
     const totalDataArray = [
       { name: 'Başarılı İşlem', value: completedTasks },
       { name: 'Hatalı İşlem', value: failedTasks },
     ];
 
-    // Tüm hesaplamaları Frontend'e JSON olarak fırlat
     res.json({
       kpi: { totalBots, activeBots, queuedTasks, successRate },
       weeklyData: weeklyDataArray,
@@ -291,10 +257,6 @@ app.get('/api/dashboard', async (req, res) => {
  * /api/tasks:
  *   get:
  *     summary: Tüm işleri listeler
- *     description: İş kuyruğundaki tüm görevleri getirir.
- *     responses:
- *       200:
- *         description: İş kuyruğu listesi başarıyla döndürüldü.
  */
 app.get('/api/tasks', async (req, res) => {
   try {
@@ -311,25 +273,6 @@ app.get('/api/tasks', async (req, res) => {
  * /api/tasks:
  *   post:
  *     summary: Yeni iş ekler
- *     description: İş kuyruğuna yeni bir görev atar.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               bot_name:
- *                 type: string
- *               description:
- *                 type: string
- *               priority:
- *                 type: string
- *               created_at:
- *                 type: string
- *     responses:
- *       201:
- *         description: İş başarıyla kaydedildi.
  */
 app.post('/api/tasks', async (req, res) => {
   try {
@@ -342,6 +285,7 @@ app.post('/api/tasks', async (req, res) => {
       [bot_name, description, priority, created_at]
     );
 
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.status(201).json(newTask.rows[0]);
   } catch (err) {
     console.error("İş kaydedilirken hata:", err);
@@ -354,25 +298,6 @@ app.post('/api/tasks', async (req, res) => {
  * /api/tasks/{id}/status:
  *   put:
  *     summary: İş durumunu günceller
- *     description: Kuyruktaki bir işin durumunu (Processing, Completed vb.) günceller.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               status:
- *                 type: string
- *     responses:
- *       200:
- *         description: İş durumu güncellendi.
  */
 app.put('/api/tasks/:id/status', async (req, res) => {
   try {
@@ -384,6 +309,7 @@ app.put('/api/tasks/:id/status', async (req, res) => {
       [status, id]
     );
 
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.json(result.rows[0]);
   } catch (err) {
     console.error("İş durumu güncellenirken hata:", err);
@@ -396,21 +322,13 @@ app.put('/api/tasks/:id/status', async (req, res) => {
  * /api/tasks/{id}:
  *   delete:
  *     summary: İşi siler
- *     description: Kuyruktan belirtilen işi siler.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: İş başarıyla silindi.
  */
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query("DELETE FROM tasks WHERE id = $1", [id]);
+    
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.json({ message: 'İş başarıyla silindi' });
   } catch (err) {
     console.error("İş silinirken hata:", err);
@@ -423,9 +341,6 @@ app.delete('/api/tasks/:id', async (req, res) => {
  * /api/logs:
  *   get:
  *     summary: Sistem loglarını getirir
- *     responses:
- *       200:
- *         description: Sistem logları listesi.
  */
 app.get('/api/logs', async (req, res) => {
   try {
@@ -442,27 +357,6 @@ app.get('/api/logs', async (req, res) => {
  * /api/logs:
  *   post:
  *     summary: Yeni log ekler
- *     description: Sisteme yeni bir hata veya bilgi logu düşer.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               bot_name:
- *                 type: string
- *               log_type:
- *                 type: string
- *               message:
- *                 type: string
- *               stack_trace:
- *                 type: string
- *               created_at:
- *                 type: string
- *     responses:
- *       201:
- *         description: Log başarıyla eklendi.
  */
 app.post('/api/logs', async (req, res) => {
   try {
@@ -473,6 +367,10 @@ app.post('/api/logs', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [bot_name, log_type || 'Info', message, stack_trace || '', created_at]
     );
+
+    // Yeni log eklendiğinde hem log datasını hem de genel güncellemeyi fırlat
+    req.app.get('io').emit('new_log', newLog.rows[0]);
+    req.app.get('io').emit('dashboard_update'); 
 
     res.status(201).json(newLog.rows[0]);
   } catch (err) {
@@ -486,9 +384,6 @@ app.post('/api/logs', async (req, res) => {
  * /api/users:
  *   get:
  *     summary: Tüm kullanıcıları listeler
- *     responses:
- *       200:
- *         description: Sistemdeki yetkili kullanıcılar.
  */
 app.get('/api/users', async (req, res) => {
   try {
@@ -504,28 +399,6 @@ app.get('/api/users', async (req, res) => {
  * /api/users:
  *   post:
  *     summary: Yeni kullanıcı oluşturur
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               full_name:
- *                 type: string
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *               role:
- *                 type: string
- *               status:
- *                 type: string
- *               created_at:
- *                 type: string
- *     responses:
- *       201:
- *         description: Kullanıcı eklendi.
  */
 app.post('/api/users', async (req, res) => {
   try {
@@ -539,7 +412,7 @@ app.post('/api/users', async (req, res) => {
     
     res.status(201).json(newUser.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Kullanıcı eklenemedi (E-posta kullanılıyor olabilir)' });
+    res.status(500).json({ error: 'Kullanıcı eklenemedi' });
   }
 });
 
@@ -547,22 +420,7 @@ app.post('/api/users', async (req, res) => {
  * @swagger
  * /api/login:
  *   post:
- *     summary: Kullanıcı girişi
- *     description: Email ve şifre ile sisteme giriş doğrulaması yapar.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Giriş başarılı.
+ *     summary: Kullanıcı girişi ve Yetkilendirme (JWT)
  */
 app.post('/api/login', async (req, res) => {
   try {
@@ -571,20 +429,32 @@ app.post('/api/login', async (req, res) => {
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Kullanıcı bulunamadı.' });
+      return res.status(401).json({ message: 'Sistemde böyle bir kullanıcı bulunamadı.' });
     }
 
     const user = result.rows[0];
 
     if (user.password !== password) {
-      return res.status(401).json({ error: 'Hatalı şifre.' });
+      return res.status(401).json({ message: 'Girdiğiniz şifre hatalı.' });
     }
 
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.full_name }, 
+      'gizli_super_anahtar_123', 
+      { expiresIn: '12h' } 
+    );
+
     const { password: userPassword, ...userInfo } = user;
-    res.status(200).json({ message: 'Giriş başarılı', user: userInfo });
+
+    res.status(200).json({ 
+      message: 'Giriş başarılı', 
+      token: token, 
+      user: userInfo 
+    });
 
   } catch (err) {
-    res.status(500).json({ error: 'Giriş sırasında sunucu hatası.' });
+    console.error("Login işlemi sırasında hata:", err);
+    res.status(500).json({ message: 'Giriş sırasında sunucu hatası yaşandı.' });
   }
 });
 
@@ -593,15 +463,6 @@ app.post('/api/login', async (req, res) => {
  * /api/users/{id}:
  *   delete:
  *     summary: Kullanıcıyı siler
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Kullanıcı silindi.
  */
 app.delete('/api/users/:id', async (req, res) => {
   try {
@@ -617,9 +478,6 @@ app.delete('/api/users/:id', async (req, res) => {
  * /api/settings:
  *   get:
  *     summary: Sistem ayarlarını getirir
- *     responses:
- *       200:
- *         description: Ayarlar JSONB objesi döner.
  */
 app.get('/api/settings', async (req, res) => {
   try {
@@ -639,15 +497,6 @@ app.get('/api/settings', async (req, res) => {
  * /api/settings:
  *   put:
  *     summary: Sistem ayarlarını günceller
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Ayarlar başarıyla güncellendi.
  */
 app.put('/api/settings', async (req, res) => {
   try {
@@ -665,6 +514,8 @@ cron.schedule('* * * * *', async () => {
     const result = await pool.query("SELECT * FROM robots WHERE schedule = 'Her Dakika' AND status != 'Error'");
     const scheduledBots = result.rows;
 
+    let updated = false;
+
     for (const bot of scheduledBots) {
       const now = new Date();
       const timeString = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}`;
@@ -678,6 +529,12 @@ cron.schedule('* * * * *', async () => {
       );
 
       console.log(`✅ [OTOMASYON] ${bot.name} için yeni görev başarıyla kuyruğa eklendi!`);
+      updated = true;
+    }
+
+    if (updated) {
+       // Eğer Cron kuyruğa yeni iş eklediyse frontend'i anında güncelle
+       io.emit('dashboard_update');
     }
   } catch (err) {
     console.error("Cron motoru çalışırken hata oluştu:", err);
@@ -703,10 +560,6 @@ async function createAuditLog(user_name, action, details) {
  * /api/audit-logs:
  *   get:
  *     summary: Tüm denetim izlerini (Audit Logs) listeler
- *     description: Sistem yöneticilerinin yaptığı işlemlerin kayıtlarını döndürür.
- *     responses:
- *       200:
- *         description: Denetim izleri başarıyla getirildi.
  */
 app.get('/api/audit-logs', async (req, res) => {
   try {
@@ -722,31 +575,6 @@ app.get('/api/audit-logs', async (req, res) => {
  * /api/robots/{id}/status:
  *   put:
  *     summary: Robotun çalışma durumunu günceller
- *     description: Botu başlatır, durdurur veya hata durumuna geçirir. Aynı zamanda Audit Log'a kayıt düşer.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               status:
- *                 type: string
- *               last_run:
- *                 type: string
- *               errorMessage:
- *                 type: string
- *               requested_by:
- *                 type: string
- *     responses:
- *       200:
- *         description: Durum başarıyla güncellendi.
  */
 app.put('/api/robots/:id/status', async (req, res) => {
   try {
@@ -784,6 +612,7 @@ app.put('/api/robots/:id/status', async (req, res) => {
     
     createAuditLog(userName, 'Bot Durum Güncellemesi', auditDetail);
 
+    req.app.get('io').emit('dashboard_update'); // Sinyal gönder
     res.json(updatedRobot);
     
   } catch (err) {
@@ -793,6 +622,7 @@ app.put('/api/robots/:id/status', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend ${PORT} portunda çalışıyor...`);
+// app.listen YERİNE server.listen KULLANIYORUZ
+server.listen(PORT, () => {
+  console.log(`Backend ve WebSocket (Gerçek Zamanlı Veri Akışı) ${PORT} portunda çalışıyor...`);
 });
