@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-const API = 'https://rpa-admin-panel.onrender.com/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = `${BASE_URL}/api`;
 
 const EMPTY = {
   kpi: { totalBots: 0, activeBots: 0, queuedTasks: 0, successRate: 0 },
@@ -120,7 +121,7 @@ useEffect(() => {
     fetchAllData();
 
     // 2. Backend ile gerçek zamanlı (WebSocket) köprüsü kur
-   const socket = io('https://rpa-admin-panel.onrender.com');
+   const socket = io(BASE_URL);
 
     // 3. Backend'den "dashboard_update" sinyali gelirse, verileri sessizce arka planda yenile
     socket.on('dashboard_update', () => {
