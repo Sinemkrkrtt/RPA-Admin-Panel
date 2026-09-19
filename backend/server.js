@@ -32,7 +32,7 @@ app.set('io', io);
 // ----------------------------------------
 
 const pool = new Pool({
-  connectionString: 'postgresql://postgres.ueaopbwoyoznldndltmc:Arsvh.141204@aws-0-eu-central-1.pooler.supabase.com:6543/postgres',
+  connectionString: 'postgresql://postgres:Arsvh.141204@db.ueaopbwoyoznldndltmc.supabase.co:5432/postgres',
   ssl: {
     rejectUnauthorized: false
   }
