@@ -11,13 +11,20 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'https://rpa-admin-panel.vercel.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Express'i HTTP sunucusu ile sarıp Socket.io'yu başlatıyoruz
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' } // React'tan gelen bağlantılara izin ver
+  cors: { 
+    origin: ['http://localhost:5173', 'https://rpa-admin-panel.vercel.app'],
+    methods: ['GET', 'POST']
+  }
 });
 
 // io objesini rotaların içinde kullanabilmek için Express'e set ediyoruz
